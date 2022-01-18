@@ -1,0 +1,8 @@
+builders:
+  flutter_form_generator:
+    import: "package:flutter_form_generator/flutter_form_generator.dart"
+    builder_factories: [ "formBuilder" ]
+    build_extensions: { ".dart": [ "multiply.g.part" ] }
+    auto_apply: dependents
+    build_to: cache
+    applies_builders: [ "source_gen|combining_builder" ]
