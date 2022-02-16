@@ -36,22 +36,31 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
 
   void handleMethodsAnnotation(Element element) {
     for (MethodElement field in (element as ClassElement).methods) {
-      print(field);
+      // print(field);
     }
   }
 
   String handleFieldsAnnotation(Element element) {
+    fields = [];
     for (var field in (element as ClassElement).fields) {
       if (_coreChecker.hasAnnotationOfExact(field)) {
-        handleField(field);
+        handleField(element, field);
       }
     }
     // widget = widget.replaceAll(
     //     "// #fields#", fields.join(',SizedBox(height: 4.0),'));
-    return fields.join(',SizedBox(height: 4.0),');
+    return fields
+        .join(',SizedBox(height: widget.verticalMarginBetweenFields),');
   }
 
-  void handleField(FieldElement fieldElement) {
+  bool _hasMethod(Element element, String methodName) {
+    return (element as ClassElement)
+        .methods
+        .where((e) => e.displayName == methodName)
+        .isNotEmpty;
+  }
+
+  void handleField(Element element, FieldElement fieldElement) {
     final fields = _coreChecker.annotationsOf(fieldElement).toList();
     for (final field in fields) {
       final type = ConstantReader(field).read('type').literalValue as String;
@@ -69,39 +78,58 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
             "${key.toStringValue()}: \'${decoration[key].toStringValue()}\',");
       }
       final inputDecorationStr = inputDecorationBuffer.toString();
+      final label = ConstantReader(field.getField('label')).literalValue;
+      String _field = '''const Padding(
+            padding: EdgeInsets.symmetric(horizontal:16.0, 
+            vertical: 4.0),child: 
+            Text("${label}", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11.0))),''';
 
       if (type == "dropdown") {
-        this.fields.add(writeDropdownField(fieldElement, field, validators,
-            inputDecorations: inputDecorationStr));
+        _field += writeDropdownField(fieldElement, field, validators,
+            inputDecorations: inputDecorationStr);
       } else if (type == 'filter_chip') {
-        this.fields.add(writeFilterChipField(fieldElement, field,
-            inputDecorations: inputDecorationStr));
+        _field += writeFilterChipField(fieldElement, field,
+            inputDecorations: inputDecorationStr);
       } else if (type == 'choice_chip') {
-        this.fields.add(writeChoiceChipField(fieldElement, field,
-            inputDecorations: inputDecorationStr));
+        _field += writeChoiceChipField(fieldElement, field,
+            inputDecorations: inputDecorationStr);
+      } else if (type == 'date') {
+        _field += writeDateTimePickerField(fieldElement, field, 'InputType.date',
+          inputDecorations: inputDecorationStr, );
       } else if (type == 'date_time') {
-        this.fields.add(writeDateTimePickerField(fieldElement, field,
-            inputDecorations: inputDecorationStr));
+        _field += writeDateTimePickerField(fieldElement, field, 'InputType.time',
+            inputDecorations: inputDecorationStr, );
       } else if (type == 'date_range') {
-        this.fields.add(writeDateRangePickerField(fieldElement, field,
-            inputDecorations: inputDecorationStr));
+        _field += writeDateRangePickerField(fieldElement, field,
+            inputDecorations: inputDecorationStr);
       } else if (type == 'slider') {
-        this.fields.add(writeSliderField(fieldElement, field,
-            inputDecorations: inputDecorationStr));
+        _field += writeSliderField(element, fieldElement, field,
+            inputDecorations: inputDecorationStr);
       } else if (type == 'checkbox') {
-        this.fields.add(writeCheckboxField(fieldElement, field, validators,
-            inputDecorations: inputDecorationStr));
+        _field += writeCheckboxField(fieldElement, field, validators,
+            inputDecorations: inputDecorationStr);
+      } else if (type == 'image') {
+        _field += writeImageField(fieldElement, field,
+            inputDecorations: inputDecorationStr);
+      } else if (type == 'chips_input') {
+        _field += writeChipsInputField(fieldElement, field,
+            inputDecorations: inputDecorationStr);
       } else {
-        this.fields.add(writeTextField(fieldElement, validators,
-            type: type, inputDecorations: inputDecorationStr));
+        _field += writeTextField(fieldElement, validators,
+            type: type, inputDecorations: inputDecorationStr);
       }
+      this.fields.add(_field);
     }
   }
 
   String writeDropdownField(
       FieldElement fieldElement, DartObject field, validators,
       {inputDecorations = ''}) {
+    final bloc = ConstantReader(field).read('bloc').literalValue as String;
     return '''
+    ${(bloc != '') ? '''BlocBuilder<${bloc}Bloc, ${bloc}State>(builder: (context, state) {
+    return''' : ''}
+     
           FormBuilderDropdown(
                 name: '${fieldElement.displayName}',
                 decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
@@ -109,11 +137,13 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                 allowClear: true,
                 hint: Text('${field.getField('hint')?.toStringValue()}'),
                 validator: ${(validators != null) ? writeValidators(validators) : ''},
-                items: ${className}.${fieldElement.displayName}Items(),
+                items: ${className}.${fieldElement.displayName}Items(context${(bloc != '') ? ', state' : ''}),
                 onChanged: (value) {
                     BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
                   },
               )
+               ${(bloc != '') ? ';})' : ''}
+              
           '''
         .replaceAll(
             '${(validators != null) ? writeValidators(validators) : ''}',
@@ -122,38 +152,47 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
 
   String writeChoiceChipField(FieldElement fieldElement, DartObject field,
       {inputDecorations = ''}) {
+    final bloc = ConstantReader(field).read('bloc').literalValue as String;
     return '''
-          FormBuilderChoiceChip(
-                name: '${fieldElement.displayName}',
-                decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
-                options: ${className}.${fieldElement.displayName}Options(),
-                onChanged: (value) {
-                    BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
-                  },
-              )
+       ${(bloc != '') ? '''BlocBuilder<${bloc}Bloc, ${bloc}State>(builder: (context, state) {
+          return ''' : ''}
+            FormBuilderChoiceChip(
+                  name: '${fieldElement.displayName}',
+                  decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
+                  options: ${className}.${fieldElement.displayName}Options(context${(bloc != '') ? ', state' : ''}),
+                  onChanged: (value) {
+                      BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                    },
+                )
+                ${(bloc != '') ? ';})' : ''}
           ''';
   }
 
   String writeFilterChipField(FieldElement fieldElement, DartObject field,
       {inputDecorations = ''}) {
+    final bloc = ConstantReader(field).read('bloc').literalValue as String;
     return '''
+     ${(bloc != '') ? '''BlocBuilder<${bloc}Bloc, ${bloc}State>(builder: (context, state) {
+    return''' : ''}
           FormBuilderFilterChip(
                 name: '${fieldElement.displayName}',
+                 spacing: 4.0,
                 decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
-                options: ${className}.${fieldElement.displayName}Options(),
+                options: ${className}.${fieldElement.displayName}Options(context${(bloc != '') ? ', state' : ''}),
                 onChanged: (value) {
                     BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
                   },
               )
+           ${(bloc != '') ? ';})' : ''}
           ''';
   }
 
-  String writeDateTimePickerField(FieldElement fieldElement, DartObject field,
+  String writeDateTimePickerField(FieldElement fieldElement, DartObject field, String type,
       {inputDecorations = ''}) {
     return '''
           FormBuilderDateTimePicker(
                 name: '${fieldElement.displayName}',
-                inputType: InputType.time,
+                inputType: ${type},
                 decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
                 initialTime: TimeOfDay(hour: 8, minute: 0),
                 onChanged: (value) {
@@ -179,25 +218,117 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
           ''';
   }
 
-  String writeSliderField(FieldElement fieldElement, DartObject field,
+  String writeSliderField(
+      Element element, FieldElement fieldElement, DartObject field,
       {inputDecorations = ''}) {
+    final max = ConstantReader(field).read('max').literalValue as double;
+    final min = ConstantReader(field).read('min').literalValue as double;
     return '''
           FormBuilderSlider(
                 name: '${fieldElement.displayName}',
                 onChanged: (value) {
                   BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
                 },
-                min: 0.0,
-                max: 10.0,
+                min: ${_hasMethod(element, '${fieldElement.displayName}Min') ? "${element.displayName}.${fieldElement.displayName}Min(context)" : "${min}"},
+                max: ${_hasMethod(element, '${fieldElement.displayName}Max') ? "${element.displayName}.${fieldElement.displayName}Max(context)" : "${max}"},
                 initialValue: 7.0,
                 divisions: 20,
                 activeColor: Colors.red,
                 inactiveColor: Colors.pink[100],
                 decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
+                
               )
           ''';
   }
 
+  String writeImageField(FieldElement fieldElement, DartObject field,
+      {inputDecorations = ''}) {
+    final maxImages =
+        ConstantReader(field).read('maxImages').literalValue as int;
+    final aspectRatio = ConstantReader(field).read('aspectRatio').literalValue;
+    String cropImage = '''
+                    final file = value?.last;
+                    final size = ImageSizeGetter.getSize(FileInput(File(file.path)));
+                    if(num.parse((size.width/size.height).toStringAsFixed(2)) == num.parse(${aspectRatio}.toStringAsFixed(2))){
+                      return;
+                    }
+                    File? croppedFile = await ImageCropper.cropImage(
+                        sourcePath: value?.last.path,
+                        aspectRatioPresets: [
+                          CropAspectRatioPreset.ratio4x3,
+                        ],
+                        androidUiSettings: const AndroidUiSettings(
+                            toolbarTitle: 'Cropper',
+                            toolbarColor: Colors.black,
+                            toolbarWidgetColor: Colors.white,
+                            initAspectRatio: CropAspectRatioPreset.ratio4x3,
+                            lockAspectRatio: false),
+                        iosUiSettings: const IOSUiSettings(
+                          minimumAspectRatio: 1.0,
+                        )
+                    );
+                    value![value.length - 1] = XFile(croppedFile?.path ??'');
+                    _formKey.currentState?.fields['images']?.didChange(value);
+                  
+    ''';
+    return '''
+          FormBuilderImagePicker(
+            name: '${fieldElement.displayName}',
+            decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
+            maxImages: ${maxImages},
+            onChanged: (value) async {
+              ${(aspectRatio != null) ? cropImage : ''}
+            },
+          )
+          ''';
+  }
+
+  String writeChipsInputField(FieldElement fieldElement, DartObject field, {String inputDecorations = ''}) {
+    // final max = ConstantReader(field).read().literalValue as double;
+    final bloc = ConstantReader(field).read('bloc').literalValue as String;
+    final searchField = ConstantReader(field).read('searchField').literalValue as String;
+    final template = ConstantReader(field).read('template').literalValue as String;
+    return '''
+    ${(bloc != '') ? '''BlocBuilder<${bloc}Bloc, ${bloc}State>(builder: (context, state) {
+    return''' : ''}
+          ChipsInputField<$template>(
+               name: '${fieldElement.displayName}',
+              decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
+              chipBuilder: (context, state, $template profile) {
+                return InputChip(
+                  key: ObjectKey(profile),
+                  label: Text((profile != null) ? profile.name: ''),
+                  onDeleted: () => state.deleteChip(profile),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                );
+              },
+              suggestionBuilder: (context, $template profile) {
+                return ListTile(
+                  key: ObjectKey(profile),
+                  title: Text((profile != null) ? profile.name: ''),
+                );
+              },
+              findSuggestions: (String query) {
+                if (query.isNotEmpty) {
+                  var lowercaseQuery = query.toLowerCase();
+                  final results = $className.${fieldElement.displayName}Items(context${(bloc != '') ? ', state' : ''}).where((profile) {
+                    return profile.$searchField
+                        .toLowerCase()
+                        .contains(query.toLowerCase());
+                  }).toList(growable: false)
+                    ..sort((a, b) => a.$searchField
+                        .toLowerCase()
+                        .indexOf(lowercaseQuery)
+                        .compareTo(
+                        ((b != null) ? b.name: '').toLowerCase().indexOf(lowercaseQuery)));
+                  return results;
+                }
+                return $className.${fieldElement.displayName}Items(context${(bloc != '') ? ', state' : ''});
+              }
+            )
+             ${(bloc != '') ? ';})' : ''}
+    ''';
+  }
   String writeCheckboxField(
       FieldElement fieldElement, DartObject field, validators,
       {inputDecorations = ''}) {
@@ -230,6 +361,7 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
   String writeTextField(FieldElement fieldElement, validators,
       {type: 'text', inputDecorations = ''}) {
     dynamic keyboardType;
+    String valueTransformer = '';
     switch (type) {
       case 'text':
         keyboardType = 'TextInputType.text';
@@ -251,6 +383,11 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
         break;
       case 'number':
         keyboardType = 'TextInputType.number';
+        valueTransformer = "valueTransformer: (value) => (value != null)? num.tryParse(value): value,";
+        break;
+      case 'double':
+        keyboardType = 'TextInputType.number';
+        valueTransformer = "valueTransformer: (value) => (value != null)? double.tryParse(value): value,";
         break;
     }
     return '''
@@ -258,12 +395,68 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                   name: '${fieldElement.displayName}',
                   decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
                   validator: ${(validators != null) ? writeValidators(validators) : ''},
+                  ${valueTransformer}
                   keyboardType: ${keyboardType},
                   onChanged: (value) {
                     BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
                   },
             )
         ''';
+  }
+
+  String _writeFormDialog(Element element) {
+    return '''
+    static ${element.displayName[0].toLowerCase()}${element.displayName.substring(1)}FormDialog(cxt, {Function? onBusinessCreated, Widget? title, Function? onSubmit, Map<String, dynamic>? payload}) {
+      showMaterialModalBottomSheet(
+        context: cxt,
+        shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(16),
+          ),
+        ),
+        clipBehavior: Clip.antiAliasWithSaveLayer,
+        builder: (context) =>
+         Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: SafeArea(
+          child: Scaffold(
+            appBar: AppBar(),
+            body: MultiBlocProvider(
+              providers: [
+                BlocProvider(
+                  create: (context) => ${element.displayName}Cubit(),
+                ), ...${_hasMethod(element, 'providers') ? "${element.displayName}.providers(context)" : "[]"}
+              ],
+              child: Padding(
+                padding: EdgeInsets.only(
+                    bottom: MediaQuery.of(context).viewInsets.bottom * 0.001),
+                child: Builder(builder: (context) {
+                  return SingleChildScrollView(
+                    child: Padding(
+                        padding: EdgeInsets.all(16.0), 
+                        child: Column(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if(title != null)
+                                  title,
+                                ${element.displayName}Form(
+                                onSubmit:  (value) async {
+                                  ${(_hasMethod(element, 'submit')) ? "final response = await _\$${element.displayName}FromJson(value).submit(context, payload: payload);" : "final response = null;"}
+                                  onSubmit?.call(response);
+                                }),
+                              ]), 
+                             ),
+                   );
+                }),
+              ),
+            ),
+           ),
+          ),  
+        ),
+      );
+    }
+    ''';
   }
 
   void writeWidget(Element element) {
@@ -276,12 +469,13 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
     class ${element.displayName}Form extends StatefulWidget {
       InputDecoration? decoration;
       Function? onSubmit;
-      ${element.displayName}Form({Key? key, this.decoration = null, this.onSubmit = null}) : super(key: key){
+      double verticalMarginBetweenFields;
+      ${element.displayName}Form({Key? key, this.decoration = null, this.onSubmit = null, this.verticalMarginBetweenFields = 8.0}) : super(key: key){
         if(decoration == null){
           decoration = ${decoratorMethod.isNotEmpty ? '${element.displayName}.decoration();' : 'InputDecoration();'}
         }
       }
-    
+      ${_writeFormDialog(element)}
       @override
       _${element.displayName}FormState createState() => _${element.displayName}FormState();
     }
@@ -290,49 +484,77 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
       final _formKey = GlobalKey<FormBuilderState>();
       @override
       Widget build(BuildContext context) {
-        return Container(
-          child: Column(
+        return SingleChildScrollView(
+            child: Column(
             children: <Widget>[
               FormBuilder(
                 key: _formKey,
                 autovalidateMode: AutovalidateMode.always,
-                child: Column(
-                  children: <Widget>[
-                    ${handleFieldsAnnotation(element)}
-                  ],
-                ),
+                child:SingleChildScrollView(
+            child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        ${handleFieldsAnnotation(element)}
+                      ],
+                    ),),
               ),
               ${writeSubmitButton(element)}
             ],
           )
         );
       }
-      
-      ${writeSubmittingFunction()}
+      @override
+      void initState() {
+      ${(_hasMethod(element, 'init')) ? "${className}.init(context);" : ""}
+      }
+      ${writeSubmittingFunction(element)}
     }
     ''';
   }
 
   String writeSubmitButton(element) {
     return '''
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: MaterialButton(
-                  color: Theme.of(context).colorScheme.secondary,
-                  child: Text(
-                    "Submit",
-                    style: TextStyle(color: Colors.white),
-                  ),
-                  onPressed: _submit,
-                ),
+    Row(
+          children: <Widget>[
+            Expanded(
+            child: Padding(
+           padding: const EdgeInsets.symmetric(vertical: 16.0),
+              child: BlocBuilder<${className}Cubit, ${className}State>(
+                builder: (context, state) {
+                  return Button(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (state is ${className}SubmittingState)
+                          const SizedBox(
+                            height: 18.0,
+                            width: 18.0,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.0,
+                            ),
+                          ),
+                        if (state is ${className}SubmittingState)
+                          const SizedBox(width: 16.0,),
+                        const Text(
+                          "Submit",
+                          style: TextStyle(color: Colors.white),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                    onPressed: (state is ${className}SubmittingState)? null: _submit,
+                  );
+                },
               ),
-            ],
-          )
+              ),
+            ),
+          ],
+        )
     ''';
   }
 
-  String writeSubmittingFunction() {
+  String writeSubmittingFunction(element) {
     return '''
            Future<String?> _submit() async {
                     _formKey.currentState?.save();
@@ -360,6 +582,13 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
       'import \'package:intl/intl.dart\';',
       'import \'package:flutter_bloc/flutter_bloc.dart\';',
       'import \'package:equatable/equatable.dart\';',
+      'import \'package:form_builder_image_picker/form_builder_image_picker.dart\';',
+      'import \'package:image_size_getter/image_size_getter.dart\';',
+      'import \'package:image_cropper/image_cropper.dart\';',
+      'import \'package:image_size_getter/file_input.dart\';',
+      'import \'package:cross_file/cross_file.dart\';',
+      'import \'package:modal_bottom_sheet/modal_bottom_sheet.dart\';',
+      'import \'package:form_builder_chips_input/form_builder_chips_input.dart\';',
     ];
     StringBuffer importsBuffer = new StringBuffer();
     String file = await buildStep.readAsString(buildStep.inputId);
@@ -374,7 +603,7 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
       File outputFile = File(buildStep.inputId.path);
       outputFile.writeAsStringSync(editedText);
     } catch (e) {
-      print(e);
+      // print(e);
     }
   }
 
@@ -432,7 +661,6 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
     StringBuffer paramsNullableBuffer = StringBuffer();
     for (var field in (element as ClassElement).fields) {
       if (_coreChecker.hasAnnotationOfExact(field)) {
-        print(field.type);
         paramsBuffer.writeln('this.${field.displayName},');
         paramsNullableBuffer.writeln(
             'final ${field.type.toString().replaceAll('?', '')}? ${field.displayName},');
@@ -455,7 +683,7 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
               ${argsBuffer.toString()}
             );
           }
-          
+           
           @override
           List<Object?> get props => [${paramsBuffer.toString().replaceAll('this.', '')}];
         }
@@ -499,4 +727,6 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
     ''');
     return stringBuffer.toString();
   }
+
+
 }

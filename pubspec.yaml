@@ -13,6 +13,9 @@ dependencies:
   flutter:
     sdk: flutter
   intl: ^0.17.0
+  form_builder_image_picker: ^2.0.0
+  flutter_chips_input: ^1.10.0
+  form_builder_chips_input: ^0.0.3
 
 dev_dependencies:
   flutter_test:
