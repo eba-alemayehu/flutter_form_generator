@@ -210,6 +210,14 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                 firstDate: DateTime(1970),
                 lastDate: DateTime(2030),
                 format: DateFormat('yyyy-MM-dd'),
+                pickerBuilder: (BuildContext context, Widget? child) {
+                    child ??= SizedBox.shrink();
+                    return Theme(
+                      data: ThemeData.light().copyWith(
+                        colorScheme: Theme.of(context).colorScheme),
+                      child: child,
+                    );
+                  },
                 onChanged: (value) {
                   BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
                 },
