@@ -94,11 +94,26 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
         _field += writeChoiceChipField(fieldElement, field,
             inputDecorations: inputDecorationStr);
       } else if (type == 'date') {
-        _field += writeDateTimePickerField(fieldElement, field, 'InputType.date',
-          inputDecorations: inputDecorationStr, );
+        _field += writeDateTimePickerField(
+          fieldElement,
+          field,
+          'InputType.date',
+          inputDecorations: inputDecorationStr,
+        );
+      } else if (type == 'time') {
+        _field += writeDateTimePickerField(
+          fieldElement,
+          field,
+          'InputType.time',
+          inputDecorations: inputDecorationStr,
+        );
       } else if (type == 'date_time') {
-        _field += writeDateTimePickerField(fieldElement, field, 'InputType.time',
-            inputDecorations: inputDecorationStr, );
+        _field += writeDateTimePickerField(
+          fieldElement,
+          field,
+          'InputType.both',
+          inputDecorations: inputDecorationStr,
+        );
       } else if (type == 'date_range') {
         _field += writeDateRangePickerField(fieldElement, field,
             inputDecorations: inputDecorationStr);
@@ -187,7 +202,8 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
           ''';
   }
 
-  String writeDateTimePickerField(FieldElement fieldElement, DartObject field, String type,
+  String writeDateTimePickerField(
+      FieldElement fieldElement, DartObject field, String type,
       {inputDecorations = ''}) {
     return '''
           FormBuilderDateTimePicker(
@@ -291,11 +307,14 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
           ''';
   }
 
-  String writeChipsInputField(FieldElement fieldElement, DartObject field, {String inputDecorations = ''}) {
+  String writeChipsInputField(FieldElement fieldElement, DartObject field,
+      {String inputDecorations = ''}) {
     // final max = ConstantReader(field).read().literalValue as double;
     final bloc = ConstantReader(field).read('bloc').literalValue as String;
-    final searchField = ConstantReader(field).read('searchField').literalValue as String;
-    final template = ConstantReader(field).read('template').literalValue as String;
+    final searchField =
+        ConstantReader(field).read('searchField').literalValue as String;
+    final template =
+        ConstantReader(field).read('template').literalValue as String;
     return '''
     ${(bloc != '') ? '''BlocBuilder<${bloc}Bloc, ${bloc}State>(builder: (context, state) {
     return''' : ''}
@@ -337,6 +356,7 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
              ${(bloc != '') ? ';})' : ''}
     ''';
   }
+
   String writeCheckboxField(
       FieldElement fieldElement, DartObject field, validators,
       {inputDecorations = ''}) {
@@ -391,11 +411,13 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
         break;
       case 'number':
         keyboardType = 'TextInputType.number';
-        valueTransformer = "valueTransformer: (value) => (value != null)? num.tryParse(value): value,";
+        valueTransformer =
+            "valueTransformer: (value) => (value != null)? num.tryParse(value): value,";
         break;
       case 'double':
         keyboardType = 'TextInputType.number';
-        valueTransformer = "valueTransformer: (value) => (value != null)? double.tryParse(value): value,";
+        valueTransformer =
+            "valueTransformer: (value) => (value != null)? double.tryParse(value): value,";
         break;
     }
     return '''
@@ -414,8 +436,8 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
 
   String _writeFormDialog(Element element) {
     return '''
-    static ${element.displayName[0].toLowerCase()}${element.displayName.substring(1)}FormDialog(cxt, {Function? onBusinessCreated, Widget? title, Function? onSubmit, Map<String, dynamic>? payload}) {
-      showMaterialModalBottomSheet(
+    static Future ${element.displayName[0].toLowerCase()}${element.displayName.substring(1)}FormDialog(cxt, {Function? onBusinessCreated, Widget? title, Function? onSubmit, Map<String, dynamic>? payload, List<Widget>? actions}) {
+      return showMaterialModalBottomSheet(
         context: cxt,
         shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
@@ -428,7 +450,7 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: SafeArea(
           child: Scaffold(
-            appBar: AppBar(),
+            appBar: AppBar( actions: actions,),
             body: MultiBlocProvider(
               providers: [
                 BlocProvider(
@@ -735,6 +757,4 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
     ''');
     return stringBuffer.toString();
   }
-
-
 }
