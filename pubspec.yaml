@@ -8,7 +8,7 @@ environment:
   flutter: ">=1.17.0"
 
 dependencies:
-  build: any
+  build: ^2.2.1
   source_gen: ^1.2.1
   flutter:
     sdk: flutter
@@ -16,6 +16,8 @@ dependencies:
   form_builder_image_picker: ^2.0.0
   flutter_chips_input: ^1.10.0
   form_builder_chips_input: ^0.0.3
+  flutter_form_gen_annotation: ^0.0.1
+  analyzer: ^3.3.1
 
 dev_dependencies:
   flutter_test:

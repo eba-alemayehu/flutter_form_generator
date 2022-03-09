@@ -7,7 +7,7 @@ import 'dart:io';
 import 'package:analyzer/dart/constant/value.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:build/build.dart';
-import 'package:flutter_form_generator/src/annotations.dart';
+import 'package:flutter_form_gen_annotation/flutter_form_gen_annotation.dart';
 import 'package:source_gen/source_gen.dart';
 
 class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
