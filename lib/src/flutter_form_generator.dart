@@ -49,6 +49,9 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
     }
     // widget = widget.replaceAll(
     //     "// #fields#", fields.join(',SizedBox(height: 4.0),'));
+    if (fields.isEmpty) {
+      return '';
+    }
     return fields
         .join(',SizedBox(height: widget.verticalMarginBetweenFields),');
   }
@@ -129,6 +132,12 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
       } else if (type == 'chips_input') {
         _field += writeChipsInputField(fieldElement, field,
             inputDecorations: inputDecorationStr);
+      } else if (type == 'phone') {
+        _field += writePhoneField(fieldElement, validators,
+            inputDecorations: inputDecorationStr);
+      } else if (type == 'word_editor') {
+        _field += writeWordEditorField(fieldElement, validators,
+            inputDecorations: inputDecorationStr);
       } else {
         _field += writeTextField(fieldElement, validators,
             type: type, inputDecorations: inputDecorationStr);
@@ -155,6 +164,8 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                 items: ${className}.${fieldElement.displayName}Items(context${(bloc != '') ? ', state' : ''}),
                 onChanged: (value) {
                     BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                     _formKey.currentState?.save();
+                    widget.onChange?.call(_formKey.currentState?.value);
                   },
               )
                ${(bloc != '') ? ';})' : ''}
@@ -177,6 +188,8 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                   options: ${className}.${fieldElement.displayName}Options(context${(bloc != '') ? ', state' : ''}),
                   onChanged: (value) {
                       BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                       _formKey.currentState?.save();
+                      widget.onChange?.call(_formKey.currentState?.value);
                     },
                 )
                 ${(bloc != '') ? ';})' : ''}
@@ -196,6 +209,8 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                 options: ${className}.${fieldElement.displayName}Options(context${(bloc != '') ? ', state' : ''}),
                 onChanged: (value) {
                     BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                     _formKey.currentState?.save();
+                    widget.onChange?.call(_formKey.currentState?.value);
                   },
               )
            ${(bloc != '') ? ';})' : ''}
@@ -213,6 +228,8 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                 initialTime: TimeOfDay(hour: 8, minute: 0),
                 onChanged: (value) {
                     BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                     _formKey.currentState?.save();
+                    widget.onChange?.call(_formKey.currentState?.value);
                   },
               )
           ''';
@@ -236,6 +253,8 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                   },
                 onChanged: (value) {
                   BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                   _formKey.currentState?.save();
+                  widget.onChange?.call(_formKey.currentState?.value);
                 },
                 decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
               )
@@ -252,6 +271,8 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                 name: '${fieldElement.displayName}',
                 onChanged: (value) {
                   BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                   _formKey.currentState?.save();
+                  widget.onChange?.call(_formKey.currentState?.value);
                 },
                 min: ${_hasMethod(element, '${fieldElement.displayName}Min') ? "${element.displayName}.${fieldElement.displayName}Min(context)" : "${min}"},
                 max: ${_hasMethod(element, '${fieldElement.displayName}Max') ? "${element.displayName}.${fieldElement.displayName}Max(context)" : "${max}"},
@@ -366,6 +387,8 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                 initialValue: false,
                 onChanged: (value) {
                   BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                   _formKey.currentState?.save();
+                  widget.onChange?.call(_formKey.currentState?.value);
                 },
                 title: RichText(
                   text: TextSpan(
@@ -391,6 +414,7 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
     dynamic keyboardType;
     String valueTransformer = '';
     switch (type) {
+      case 'word_editor':
       case 'text':
         keyboardType = 'TextInputType.text';
         break;
@@ -429,14 +453,81 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
                   keyboardType: ${keyboardType},
                   onChanged: (value) {
                     BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                     _formKey.currentState?.save();
+                    widget.onChange?.call(_formKey.currentState?.value);
                   },
+            )
+        ''';
+  }
+
+  String writePhoneField(FieldElement fieldElement, validators,
+      {inputDecorations = ''}) {
+    return '''
+            FormBuilderPhoneField(
+                  name: '${fieldElement.displayName}',
+                  decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
+                  validator: ${(validators != null) ? writeValidators(validators) : ''},
+                  priorityListByIsoCode: ['ET'],
+                  countryFilterByIsoCode: ['ET'],
+                  defaultSelectedCountryIsoCode: 'ET',
+                  onChanged: (value) {
+                    BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                    _formKey.currentState?.save();
+                    widget.onChange?.call(_formKey.currentState?.value);
+                  },
+            )
+        ''';
+  }
+
+  String writeWordEditorField(FieldElement fieldElement, validators,
+      {inputDecorations = ''}) {
+    return '''
+            FormBuilderField(
+              name: '${fieldElement.displayName}',
+              validator: ${(validators != null) ? writeValidators(validators) : ''},
+              builder: (FormFieldState<dynamic> field) {
+                HtmlEditorController controller = HtmlEditorController();
+                return InputDecorator(
+                  decoration: (widget.decoration ?? InputDecoration()).copyWith(${inputDecorations}),
+                  child: Container(
+                    child: HtmlEditor(
+                        controller: controller, //required
+                        callbacks: Callbacks(
+                            onChangeContent: (value) {
+                              field.didChange(value);
+                              BlocProvider.of<${className}Cubit>(context).${fieldElement.displayName}Changed(value);
+                              _formKey.currentState?.save();
+                              widget.onChange?.call(_formKey.currentState?.value);
+                            }
+                          ),
+                        htmlEditorOptions: HtmlEditorOptions(
+                          hint: "Your ${fieldElement.displayName} here...",
+                          //initalText: "text content initial, if any",
+                        ),   
+                         htmlToolbarOptions: HtmlToolbarOptions(
+                          toolbarPosition: ToolbarPosition.aboveEditor,
+                          toolbarType: ToolbarType.nativeGrid,
+                           defaultToolbarButtons: [
+                                FontButtons(subscript: false, superscript: false, clearAll: false),
+                                ListButtons(),
+                                ParagraphButtons(caseConverter: false, textDirection: false),
+                                StyleButtons()
+                            ]
+                        ),
+                        otherOptions: OtherOptions(
+                          height: 400,
+                        ),
+                    ),
+                  ),
+                );
+              },
             )
         ''';
   }
 
   String _writeFormDialog(Element element) {
     return '''
-    static Future ${element.displayName[0].toLowerCase()}${element.displayName.substring(1)}FormDialog(cxt, {Function? onBusinessCreated, Widget? title, Function? onSubmit, Map<String, dynamic>? payload, List<Widget>? actions}) {
+    static Future ${element.displayName[0].toLowerCase()}${element.displayName.substring(1)}FormDialog(cxt, {Function? onBusinessCreated, Widget? title, Function? onSubmit, Map<String, dynamic>? payload, List<Widget>? actions, bool appbar = true}) {
       return showMaterialModalBottomSheet(
         context: cxt,
         shape: const RoundedRectangleBorder(
@@ -450,12 +541,12 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: SafeArea(
           child: Scaffold(
-            appBar: AppBar( actions: actions,),
+            appBar: (appbar)? AppBar( actions: actions,):PreferredSize(preferredSize: const ui.Size.fromHeight(0), child: Container()),
             body: MultiBlocProvider(
               providers: [
                 BlocProvider(
                   create: (context) => ${element.displayName}Cubit(),
-                ), ...${_hasMethod(element, 'providers') ? "${element.displayName}.providers(context)" : "[]"}
+                ), ...${_hasMethod(element, 'providers') ? "${element.displayName}.providers(cxt)" : "[]"}
               ],
               child: Padding(
                 padding: EdgeInsets.only(
@@ -500,7 +591,10 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
       InputDecoration? decoration;
       Function? onSubmit;
       double verticalMarginBetweenFields;
-      ${element.displayName}Form({Key? key, this.decoration = null, this.onSubmit = null, this.verticalMarginBetweenFields = 8.0}) : super(key: key){
+      final Map<String, dynamic>? params;
+      final Function? onChange;
+      
+      ${element.displayName}Form({Key? key, this.decoration = null, this.onSubmit = null, this.verticalMarginBetweenFields = 8.0, this.params, this.onChange}) : super(key: key){
         if(decoration == null){
           decoration = ${decoratorMethod.isNotEmpty ? '${element.displayName}.decoration();' : 'InputDecoration();'}
         }
@@ -544,6 +638,7 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
 
   String writeSubmitButton(element) {
     return '''
+    if (widget.onSubmit != null)
     Row(
           children: <Widget>[
             Expanded(
@@ -619,6 +714,9 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
       'import \'package:cross_file/cross_file.dart\';',
       'import \'package:modal_bottom_sheet/modal_bottom_sheet.dart\';',
       'import \'package:form_builder_chips_input/form_builder_chips_input.dart\';',
+      'import \'package:form_builder_phone_field/form_builder_phone_field.dart\';',
+      'import \'package:html_editor_enhanced/html_editor.dart\';',
+      'import \'dart:ui\' as ui;'
     ];
     StringBuffer importsBuffer = new StringBuffer();
     String file = await buildStep.readAsString(buildStep.inputId);
@@ -645,19 +743,19 @@ class FlutterFormGenerator extends GeneratorForAnnotation<FormWidget> {
         final validatorsStr = validator.toStringValue()?.split(":");
         if (validatorsStr != null) {
           String validatorTypes = validatorsStr[0];
-          validatorsStr[0] = 'context';
+          // validatorsStr[0] = 'context';
           switch (validatorTypes) {
             case 'required':
               validatorBuffer.writeln(
-                  "FormBuilderValidators.required(${validatorsStr.join(',')}),");
+                  "FormBuilderValidators.required(context, errorText: \"This field required.\"),");
               break;
             case 'numeric':
               validatorBuffer.writeln(
-                  "FormBuilderValidators.numeric(${validatorsStr.join(',')}),");
+                  "FormBuilderValidators.numeric(${validatorsStr.join(',')}, errorText: \"Only numeric values are required.\"),");
               break;
             case 'max':
               validatorBuffer.writeln(
-                  "FormBuilderValidators.max(${validatorsStr.join(',')}),");
+                  "FormBuilderValidators.max(${validatorsStr.join(',')}, errorText: \"Max value is ${validatorsStr.join(',')}.\"),");
               break;
           }
         }
